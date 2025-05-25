@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>授权 DApp</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+  <style>
+    body { font-family: Arial; text-align: center; margin-top: 100px; }
+    button { font-size: 18px; padding: 10px 20px; margin: 10px; }
+  </style>
+</head>
+<body>
+
+  <h1>授权 DApp</h1>
+  <p>点击下方按钮连接钱包并授权当前地址。</p>
+
+  <button id="connectBtn">连接钱包</button>
+  <button id="authorizeBtn" disabled>授权地址</button>
+  <p id="status" style="margin-top:20px; color: red;"></p>
+
+  <script>
+    const contractAddress = "0x9ee13fEe17a03082786e5b50520D27c7257AA17f";
+    const abi = [
+      "function authorize(address _addr) public",
+      "function owner() public view returns (address)"
+    ];
+
+    let provider, signer, contract;
+
+    document.getElementById("connectBtn").onclick = async function () {
+      const status = document.getElementById("status");
+      status.textContent = "";
+
+      if (!window.ethereum) {
+        status.textContent = "未检测到以太坊钱包，请在钱包 App 中打开此页面";
+        return;
+      }
+
+      try {
+        await ethereum.request({ method: "eth_requestAccounts" });
+
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+
+        const network = await provider.getNetwork();
+        console.log("当前网络:", network.name, "Chain ID:", network.chainId);
+
+        if (network.chainId !== 1) {
+          if (!confirm("当前网络不是 Ethereum 主网，是否继续？")) {
+            return;
+          }
+        }
+
+        contract = new ethers.Contract(contractAddress, abi, signer);
+
+        const userAddress = await signer.getAddress();
+        status.textContent = "连接成功：" + userAddress;
+        document.getElementById("authorizeBtn").disabled = false;
+      } catch (err) {
+        console.error("连接失败：", err);
+        status.textContent = "连接失败：" + err.message;
+      }
+    };
+
+    document.getElementById("authorizeBtn").onclick = async function () {
+      const status = document.getElementById("status");
+      try {
+        const userAddress = await signer.getAddress();
+        const tx = await contract.authorize(userAddress);
+        status.textContent = "授权中... TX Hash: " + tx.hash;
+        await tx.wait();
+        status.textContent = "授权成功！";
+      } catch (err) {
+        console.error("授权失败：", err);
+        status.textContent = "授权失败：" + err.message;
+      }
+    };
+  </script>
+
+</body>
+</html>
